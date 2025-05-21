@@ -8,21 +8,21 @@
        FILE-CONTROL.
            SELECT EARQCLI ASSIGN TO ".\EARQCLI.TXT"
                FILE STATUS IS FS-EARQCLI.
+           SELECT SARQCLI ASSIGN TO ".\SARQCLI.TXT"
+               FILE STATUS IS FS-SARQCLI.
        DATA DIVISION.
        FILE SECTION.
        FD  EARQCLI 
            RECORDING MODE IS FIXED.
-       01  REGISTRO.
-           05 REG-AGENCIA              PICTURE X(04).
-           05 REG-CONTA                PICTURE X(05).
-           05 REG-NOME                 PICTURE X(30).
-           05 REG-GERENTE              PICTURE X(03).
-           05 REG-TIPO-CONTA           PICTURE 9(01).
-           05 REG-SALDO                PICTURE 9(10)V99.
-
+           COPY "BOOKCLI".
+       FD  SARQCLI
+           RECORDING MODE IS FIXED.
+      *    LAYOUT = 22 POSICOES (AGENCIA, CONTA, TIPO E SALDO)
+       01  REG-SARQCLI                 PICTURE X(22).
        WORKING-STORAGE SECTION.
 
        01  FS-EARQCLI                  PICTURE 9(02).
+       01  FS-SARQCLI                  PICTURE 9(02).
        01  WRK-CONTADOR                PICTURE 9(03)   USAGE COMP.
        01  WRK-CONTADOR-VALIDO         PICTURE 9(03)   USAGE COMP.
        01  WRK-CONTADOR-NVALIDO        PICTURE 9(03)   USAGE COMP.
@@ -37,8 +37,10 @@
 
        0200-INICIAR        SECTION.
            OPEN INPUT EARQCLI.
-           IF FS-EARQCLI NOT EQUALS ZEROS 
-               DISPLAY "ARQUIVO NAO ABERTO"
+           OPEN OUTPUT SARQCLI.
+           IF FS-EARQCLI NOT EQUALS ZEROS OR 
+               FS-SARQCLI NOT EQUALS ZEROS 
+               DISPLAY "ARQUIVO(S) NAO ABERTO(S)"
                GOBACK
            END-IF.  
            PERFORM 0210-LEITURA.      
@@ -53,24 +55,33 @@
            IF REG-SALDO GREATER THAN OR EQUAL 5000 AND
                (REG-TIPO-CONTA EQUAL 1 OR REG-TIPO-CONTA EQUAL 2)
 
-               DISPLAY  REGISTRO
+               STRING      REG-AGENCIA     DELIMITED BY SIZE
+                           REG-CONTA       DELIMITED BY SIZE
+                           REG-TIPO-CONTA  DELIMITED BY SIZE
+                           REG-SALDO       DELIMITED BY SIZE
+                   INTO    REG-SARQCLI
+               WRITE REG-SARQCLI   
+               IF FS-SARQCLI NOT EQUAL ZEROS 
+                   DISPLAY "ERRO AO GRAVAR " REG-AGENCIA REG-CONTA
+               END-IF
+
                ADD 1 TO WRK-CONTADOR-VALIDO
-               DISPLAY "------------------"
            ELSE 
-               EVALUATE TRUE 
-                   WHEN REG-SALDO LESS 5000
-                       DISPLAY "SALDO NAO COMPATIVEL"    
-                   WHEN REG-TIPO-CONTA NOT EQUAL 1 OR
-                        REG-TIPO-CONTA NOT EQUAL 2 
-                        DISPLAY "TIPO DE CONTA NAO EXISTE"
-                END-EVALUATE
+      *         EVALUATE TRUE 
+      *             WHEN REG-SALDO LESS 5000
+      *                 DISPLAY "SALDO NAO COMPATIVEL"    
+      *             WHEN REG-TIPO-CONTA NOT EQUAL 1 OR
+      *                  REG-TIPO-CONTA NOT EQUAL 2 
+      *                  DISPLAY "TIPO DE CONTA NAO EXISTE"
+      *          END-EVALUATE
                 ADD 1 TO WRK-CONTADOR-NVALIDO
            END-IF.
            PERFORM 0210-LEITURA.
        0300-FIM. EXIT.
 
        0400-FINALIZAR      SECTION.
-           CLOSE EARQCLI
+           CLOSE   EARQCLI
+                   SARQCLI.
            DISPLAY "--- FIM DO PROGRAMA ---".
            DISPLAY "CLIENTES LIDOS :" WRK-CONTADOR.
            DISPLAY "VALIDOS........:" WRK-CONTADOR-VALIDO.
